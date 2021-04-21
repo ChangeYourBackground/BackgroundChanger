@@ -17,39 +17,34 @@
 package org.tensorflow.lite.examples.imagesegmentation
 
 import android.Manifest
-import androidx.lifecycle.Observer
-import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.*
 import android.hardware.camera2.CameraCharacteristics
 import android.os.Bundle
 import android.os.Process
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import android.util.Log
 import android.util.TypedValue
 import android.view.animation.AnimationUtils
 import android.view.animation.BounceInterpolator
-import android.widget.Button
-import android.widget.FrameLayout
-import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.Switch
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
+import androidx.lifecycle.Observer
+import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import com.bumptech.glide.Glide
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
-import java.io.File
-import java.util.concurrent.Executors
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import org.tensorflow.lite.examples.imagesegmentation.camera.CameraFragment
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ImageSegmentationModelExecutor
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ModelExecutionResult
+import java.io.File
+import java.io.InputStream
+import java.util.concurrent.Executors
 
 // This is an arbitrary number we are using to keep tab of the permission
 // request. Where an app has multiple context for requesting permission,
@@ -63,6 +58,8 @@ private const val TAG = "MainActivity"
 
 class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
 
+    private val INPUT = "input_image.jpg"
+    private lateinit var backgroundBitmap: Bitmap
     private lateinit var cameraFragment: CameraFragment
     private lateinit var viewModel: MLExecutionViewModel
     private lateinit var viewFinder: FrameLayout
@@ -141,6 +138,8 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         setChipsToLogView(HashMap<String, Int>())
         setupControls()
         enableControls(true)
+
+        backgroundBitmap = loadImage(INPUT)!!
     }
 
     private fun createModelExecutor(useGPU: Boolean) {
@@ -208,12 +207,15 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
     }
 
     private fun updateUIWithResults(modelExecutionResult: ModelExecutionResult) {
-        modelExecutionResult.bitmapOriginal.apply {
-            modelExecutionResult.bitmapMaskOnly.let { resultImageView.setImageBitmap(mask(it)) }
-        }
-//        setImageView(resultImageView, modelExecutionResult.bitmapResult)
+        val resultBitmap = maskBitmap(modelExecutionResult.bitmapOriginal,
+                modelExecutionResult.bitmapMaskOnly,
+                PorterDuff.Mode.DST_IN)
+        val resultOnBackground = maskBitmap(backgroundBitmap,
+                resultBitmap,
+                PorterDuff.Mode.SRC_OVER)
+        setImageView(resultImageView, resultBitmap)
         setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
-        setImageView(maskImageView, modelExecutionResult.bitmapMaskOnly)
+        setImageView(maskImageView, resultOnBackground)
         val logText: TextView = findViewById(R.id.log_view)
         logText.text = modelExecutionResult.executionLog
 
@@ -295,24 +297,36 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         viewModel.onApplyModel(file.absolutePath, imageSegmentationModel, inferenceThread)
     }
 
-    fun Bitmap.mask(mask: Bitmap): Bitmap? {
-        val bitmap = Bitmap.createBitmap(
+    fun maskBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
+        val resultBitmap = Bitmap.createBitmap(
                 mask.width, mask.height, Bitmap.Config.ARGB_8888
         )
 
         // paint to mask
         val paint = Paint().apply {
             isAntiAlias = true
-            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+            xfermode = PorterDuffXfermode(mode)
         }
 
-        Canvas(bitmap).apply {
+        Canvas(resultBitmap).apply {
             // draw source bitmap on canvas
-            drawBitmap(this@mask, 0f, 0f, null)
+            drawBitmap(bitmap, 0f, 0f, null)
             // mask bitmap
             drawBitmap(mask, 0f, 0f, paint)
         }
 
-        return bitmap
+        return resultBitmap
+    }
+
+    private fun convertToAlphaMask(mask: Bitmap): Bitmap {
+        val alphaMask = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ALPHA_8)
+        val canvas = Canvas(alphaMask)
+        canvas.drawBitmap(mask, 0.0f, 0.0f, null)
+        return alphaMask
+    }
+
+    private fun loadImage(fileName: String): Bitmap? {
+        val inputStream: InputStream? = assets.open(fileName)
+        return BitmapFactory.decodeStream(inputStream)
     }
 }
