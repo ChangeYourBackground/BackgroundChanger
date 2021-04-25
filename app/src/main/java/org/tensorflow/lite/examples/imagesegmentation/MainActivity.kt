@@ -82,10 +82,6 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.tfe_is_activity_main)
 
-        val toolbar: Toolbar = findViewById(R.id.toolbar)
-        setSupportActionBar(toolbar)
-        supportActionBar?.setDisplayShowTitleEnabled(false)
-
         viewFinder = findViewById(R.id.view_finder)
         resultImageView = findViewById(R.id.result_imageview)
         originalImageView = findViewById(R.id.original_imageview)

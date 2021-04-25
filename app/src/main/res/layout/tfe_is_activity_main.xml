@@ -7,24 +7,12 @@
     android:background="#00000000"
     tools:context="org.tensorflow.lite.examples.imagesegmentation.MainActivity">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        android:background="@android:color/white">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/tfl2_logo_dark" />
-    </androidx.appcompat.widget.Toolbar>
-
     <LinearLayout
         android:id="@+id/images_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
         android:gravity="center_horizontal"
+        android:orientation="vertical"
         android:paddingTop="?attr/actionBarSize">
 
         <LinearLayout
