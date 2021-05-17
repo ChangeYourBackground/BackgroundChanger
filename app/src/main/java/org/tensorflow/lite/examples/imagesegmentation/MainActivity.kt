@@ -207,10 +207,10 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
     }
 
     private fun updateUIWithResults(modelExecutionResult: ModelExecutionResult) {
-        val resultBitmap = maskBitmap(modelExecutionResult.bitmapOriginal,
+        val resultBitmap = applyMaskOnBitmap(modelExecutionResult.bitmapOriginal,
                 modelExecutionResult.bitmapMaskOnly,
                 PorterDuff.Mode.DST_IN)
-        val resultOnBackground = maskBitmap(backgroundBitmap,
+        val resultOnBackground = applyMaskOnBitmap(backgroundBitmap,
                 resultBitmap,
                 PorterDuff.Mode.SRC_OVER)
         setImageView(resultImageView, resultBitmap)
@@ -297,7 +297,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         viewModel.onApplyModel(file.absolutePath, imageSegmentationModel, inferenceThread)
     }
 
-    fun maskBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
+    fun applyMaskOnBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
                 mask.width, mask.height, Bitmap.Config.ARGB_8888
         )
@@ -309,20 +309,11 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         }
 
         Canvas(resultBitmap).apply {
-            // draw source bitmap on canvas
             drawBitmap(bitmap, 0f, 0f, null)
-            // mask bitmap
             drawBitmap(mask, 0f, 0f, paint)
         }
 
         return resultBitmap
-    }
-
-    private fun convertToAlphaMask(mask: Bitmap): Bitmap {
-        val alphaMask = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ALPHA_8)
-        val canvas = Canvas(alphaMask)
-        canvas.drawBitmap(mask, 0.0f, 0.0f, null)
-        return alphaMask
     }
 
     private fun loadImage(fileName: String): Bitmap? {

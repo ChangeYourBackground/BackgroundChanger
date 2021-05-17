@@ -137,7 +137,7 @@ class ImageSegmentationModelExecutor(
     return Pair(Bitmap.createScaledBitmap(maskBitmap, inputWidth, inputHeight, true), itemsFound)
   }
 
-  private fun stackTwoBitmaps(foregrand: Bitmap, background: Bitmap): Bitmap {
+  fun stackTwoBitmaps(foregrand: Bitmap, background: Bitmap): Bitmap {
     val mergedBitmap =
       Bitmap.createBitmap(foregrand.getWidth(), foregrand.getHeight(), foregrand.getConfig())
     val canvas = Canvas(mergedBitmap)
@@ -165,6 +165,6 @@ class ImageSegmentationModelExecutor(
     public const val TAG = "SegmentationTask"
     private const val NUM_THREADS = 4
     private const val IMAGE_SEGMENTATION_MODEL = "deeplabv3_257_mv_gpu.tflite"
-    private const val ALPHA_VALUE = 128
+    private const val ALPHA_VALUE = 255
   }
 }
