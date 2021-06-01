@@ -10,85 +10,98 @@
     <LinearLayout
         android:id="@+id/images_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="703dp"
         android:gravity="center_horizontal"
         android:orientation="vertical"
         android:paddingTop="?attr/actionBarSize">
 
         <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center_horizontal">
+            android:layout_width="309dp"
+            android:layout_height="219dp"
+            android:orientation="vertical">
 
-            <FrameLayout
-                android:id="@+id/view_finder"
-                android:layout_width="300dp"
-                android:layout_height="300dp"
-                android:paddingTop="16dp" />
+            <ImageView
+                android:id="@+id/original_imageview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                tools:srcCompat="@tools:sample/backgrounds/scenic" />
         </LinearLayout>
 
-        <HorizontalScrollView
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="51dp"
+            android:orientation="horizontal">
 
-            <LinearLayout
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/capture_button1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginStart="50dp"
+                android:layout_marginEnd="8dp"
+                android:clickable="true"
+                android:foregroundGravity="clip_vertical"
+                app:backgroundTint="@android:color/white"
+                app:srcCompat="@android:drawable/ic_menu_camera" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/gallery_button1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="end"
+                android:layout_marginEnd="8dp"
+                android:clickable="true"
+                android:foregroundGravity="clip_vertical"
+                app:backgroundTint="@android:color/white"
+                app:srcCompat="@android:drawable/ic_menu_gallery" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="312dp"
+            android:layout_height="224dp"
+            android:gravity="top|left">
+
+            <ImageView
+                android:id="@+id/mask_imageview"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:layout_weight="1"
+                tools:srcCompat="@tools:sample/backgrounds/scenic" />
+        </LinearLayout>
 
-                <ImageView
-                    android:id="@+id/original_imageview"
-                    android:layout_width="@dimen/tfe_is_preview_size"
-                    android:layout_height="@dimen/tfe_is_preview_size"
-                    android:padding="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-                <ImageView
-                    android:id="@+id/result_imageview"
-                    android:layout_width="@dimen/tfe_is_preview_size"
-                    android:layout_height="@dimen/tfe_is_preview_size"
-                    android:padding="8dp" />
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/gallery_button2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="right"
+                android:layout_marginStart="50dp"
+                android:layout_marginEnd="8dp"
+                android:clickable="true"
+                android:foregroundGravity="clip_vertical"
+                app:backgroundTint="@android:color/white"
+                app:srcCompat="@android:drawable/ic_menu_gallery" />
+        </LinearLayout>
 
-                <ImageView
-                    android:id="@+id/mask_imageview"
-                    android:layout_width="@dimen/tfe_is_preview_size"
-                    android:layout_height="@dimen/tfe_is_preview_size"
-                    android:padding="8dp" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:orientation="horizontal">
 
-            </LinearLayout>
-        </HorizontalScrollView>
+            <Button
+                android:id="@+id/swap_button"
+                android:layout_width="50dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Podmień" />
+        </LinearLayout>
+
     </LinearLayout>
 
     <include layout="@layout/tfe_is_bottom_sheet_layout" />
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/capture_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:layout_marginEnd="8dp"
-        android:clickable="true"
-        app:backgroundTint="@android:color/white"
-        app:layout_anchor="@id/bottom_sheet"
-        app:layout_anchorGravity="top|end"
-        app:srcCompat="@android:drawable/ic_menu_camera" />
-
-    <View
-        android:id="@+id/dummy"
-        android:layout_width="1dp"
-        android:layout_height="80dp"
-        android:layout_marginEnd="8dp"
-        app:layout_anchor="@id/capture_button"
-        app:layout_anchorGravity="top|right|end" />
-
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/toggle_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:layout_marginEnd="8dp"
-        android:clickable="true"
-        app:backgroundTint="@android:color/white"
-        app:layout_anchor="@id/dummy"
-        app:layout_anchorGravity="top|end"
-        app:srcCompat="@android:drawable/ic_popup_sync" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

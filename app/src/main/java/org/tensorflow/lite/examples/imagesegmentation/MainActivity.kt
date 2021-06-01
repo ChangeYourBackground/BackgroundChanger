@@ -19,23 +19,27 @@ package org.tensorflow.lite.examples.imagesegmentation
 import android.Manifest
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.content.Intent
 import android.graphics.*
 import android.hardware.camera2.CameraCharacteristics
+import android.net.Uri
 import android.os.Bundle
 import android.os.Process
+import android.provider.MediaStore
 import android.util.Log
 import android.util.TypedValue
 import android.view.animation.AnimationUtils
 import android.view.animation.BounceInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.Toolbar
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import com.bumptech.glide.Glide
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import kotlinx.android.synthetic.main.tfe_is_activity_main.*
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
@@ -68,13 +72,17 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
     private lateinit var maskImageView: ImageView
     private lateinit var chipsGroup: ChipGroup
     private lateinit var rerunButton: Button
-    private lateinit var captureButton: ImageButton
+    private lateinit var captureButton1: ImageButton
+    private lateinit var captureButton2: ImageButton
+    private lateinit var galleryButton1: FloatingActionButton
+    private lateinit var galleryButton2: FloatingActionButton
 
     private var lastSavedFile = ""
     private var useGPU = false
     private var imageSegmentationModel: ImageSegmentationModelExecutor? = null
     private val inferenceThread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val mainScope = MainScope()
+    private val pickImage = 100
 
     private var lensFacing = CameraCharacteristics.LENS_FACING_FRONT
 
@@ -82,24 +90,42 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.tfe_is_activity_main)
 
-        viewFinder = findViewById(R.id.view_finder)
-        resultImageView = findViewById(R.id.result_imageview)
         originalImageView = findViewById(R.id.original_imageview)
         maskImageView = findViewById(R.id.mask_imageview)
         chipsGroup = findViewById(R.id.chips_group)
-        captureButton = findViewById(R.id.capture_button)
+        captureButton1 = findViewById(R.id.capture_button1)
+        galleryButton1 = findViewById(R.id.gallery_button1)
+        galleryButton2 = findViewById(R.id.gallery_button2)
+
+        galleryButton1.setOnClickListener{
+            val gallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
+            startActivityForResult(gallery, pickImage)
+        }
+
+        galleryButton2.setOnClickListener{
+            val gallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
+            startActivityForResult(gallery, pickImage+1)
+        }
+
+        captureButton1.setOnClickListener{
+                val intent = Intent(this, take_picture::class.java);
+                startActivity(intent);
+        }
+
         val useGpuSwitch: Switch = findViewById(R.id.switch_use_gpu)
 
-        // Request camera permissions
+        // Request camera permission
+        /*
         if (allPermissionsGranted()) {
-            addCameraFragment()
+            //addCameraFragment()
         } else {
             ActivityCompat.requestPermissions(
                     this,
                     REQUIRED_PERMISSIONS,
                     REQUEST_CODE_PERMISSIONS
             )
-        }
+        }*/
+
 
         viewModel = AndroidViewModelFactory(application).create(MLExecutionViewModel::class.java)
         viewModel.resultingBitmap.observe(
@@ -129,13 +155,23 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
             }
         }
 
-        animateCameraButton()
-
         setChipsToLogView(HashMap<String, Int>())
-        setupControls()
         enableControls(true)
 
         backgroundBitmap = loadImage(INPUT)!!
+
+         
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && requestCode == pickImage) {
+            if(requestCode==100) {
+                originalImageView.setImageURI(data?.data)
+            }else{
+                maskImageView.setImageURI(data?.data)
+            }
+        }
     }
 
     private fun createModelExecutor(useGPU: Boolean) {
@@ -150,13 +186,6 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
             val logText: TextView = findViewById(R.id.log_view)
             logText.text = e.message
         }
-    }
-
-    private fun animateCameraButton() {
-        val animation = AnimationUtils.loadAnimation(this, R.anim.scale_anim)
-        animation.interpolator = BounceInterpolator()
-        captureButton.animation = animation
-        captureButton.animation.start()
     }
 
     private fun setChipsToLogView(itemsFound: Map<String, Int>) {
@@ -209,7 +238,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         val resultOnBackground = maskBitmap(backgroundBitmap,
                 resultBitmap,
                 PorterDuff.Mode.SRC_OVER)
-        setImageView(resultImageView, resultBitmap)
+        //setImageView(resultImageView, resultBitmap)
         setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
         setImageView(maskImageView, resultOnBackground)
         val logText: TextView = findViewById(R.id.log_view)
@@ -221,24 +250,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
 
     private fun enableControls(enable: Boolean) {
         rerunButton.isEnabled = enable && lastSavedFile.isNotEmpty()
-        captureButton.isEnabled = enable
-    }
-
-    private fun setupControls() {
-        captureButton.setOnClickListener {
-            it.clearAnimation()
-            cameraFragment.takePicture()
-        }
-
-        findViewById<ImageButton>(R.id.toggle_button).setOnClickListener {
-            lensFacing = if (lensFacing == CameraCharacteristics.LENS_FACING_BACK) {
-                CameraCharacteristics.LENS_FACING_FRONT
-            } else {
-                CameraCharacteristics.LENS_FACING_BACK
-            }
-            cameraFragment.setFacingCamera(lensFacing)
-            addCameraFragment()
-        }
+        captureButton1.isEnabled = enable
     }
 
     /**
@@ -254,7 +266,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 addCameraFragment()
-                viewFinder.post { setupControls() }
+                viewFinder.post {  }
             } else {
                 Toast.makeText(
                         this,
@@ -271,7 +283,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         cameraFragment.setFacingCamera(lensFacing)
         supportFragmentManager.popBackStack()
         supportFragmentManager.beginTransaction()
-                .replace(R.id.view_finder, cameraFragment)
+                .replace(R.id.mask_imageview, cameraFragment)
                 .commit()
     }
 
