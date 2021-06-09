@@ -16,7 +16,7 @@
         android:paddingTop="?attr/actionBarSize">
 
         <LinearLayout
-            android:layout_width="309dp"
+            android:layout_width="wrap_content"
             android:layout_height="219dp"
             android:orientation="vertical">
 
@@ -75,11 +75,23 @@
             android:orientation="horizontal">
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/capture_button2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="start"
+                android:layout_marginStart="50dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:foregroundGravity="clip_vertical"
+                app:backgroundTint="@android:color/white"
+                app:srcCompat="@android:drawable/ic_menu_camera" />
+
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/gallery_button2"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="right"
-                android:layout_marginStart="50dp"
                 android:layout_marginEnd="8dp"
                 android:clickable="true"
                 android:foregroundGravity="clip_vertical"

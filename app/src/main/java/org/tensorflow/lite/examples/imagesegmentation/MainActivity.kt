@@ -17,6 +17,9 @@
 package org.tensorflow.lite.examples.imagesegmentation
 
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.ContentResolver
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.content.Intent
@@ -24,8 +27,10 @@ import android.graphics.*
 import android.hardware.camera2.CameraCharacteristics
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.os.Process
 import android.provider.MediaStore
+import android.renderscript.ScriptGroup
 import android.util.Log
 import android.util.TypedValue
 import android.view.animation.AnimationUtils
@@ -33,6 +38,7 @@ import android.view.animation.BounceInterpolator
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
 import com.bumptech.glide.Glide
@@ -47,8 +53,12 @@ import org.tensorflow.lite.examples.imagesegmentation.camera.CameraFragment
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ImageSegmentationModelExecutor
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ModelExecutionResult
 import java.io.File
+import java.io.IOException
 import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.Executors
+import kotlin.collections.HashMap
 
 // This is an arbitrary number we are using to keep tab of the permission
 // request. Where an app has multiple context for requesting permission,
@@ -60,9 +70,9 @@ private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
 
 private const val TAG = "MainActivity"
 
-class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
+class MainActivity : AppCompatActivity() {
 
-    private val INPUT = "input_image.jpg"
+    //private val INPUT = "input_image.jpg"
     private lateinit var backgroundBitmap: Bitmap
     private lateinit var cameraFragment: CameraFragment
     private lateinit var viewModel: MLExecutionViewModel
@@ -76,6 +86,10 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
     private lateinit var captureButton2: ImageButton
     private lateinit var galleryButton1: FloatingActionButton
     private lateinit var galleryButton2: FloatingActionButton
+    private lateinit var swapButton: Button
+    lateinit var  currentPhotoPath: String
+
+    val REQEST_TAKE_PHOTO = 1
 
     private var lastSavedFile = ""
     private var useGPU = false
@@ -94,8 +108,10 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         maskImageView = findViewById(R.id.mask_imageview)
         chipsGroup = findViewById(R.id.chips_group)
         captureButton1 = findViewById(R.id.capture_button1)
+        captureButton2 = findViewById(R.id.capture_button2)
         galleryButton1 = findViewById(R.id.gallery_button1)
         galleryButton2 = findViewById(R.id.gallery_button2)
+        swapButton = findViewById(R.id.swap_button)
 
         galleryButton1.setOnClickListener{
             val gallery = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.INTERNAL_CONTENT_URI)
@@ -108,14 +124,23 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         }
 
         captureButton1.setOnClickListener{
-                val intent = Intent(this, take_picture::class.java);
-                startActivity(intent);
+            takePicture(1)
+            galleryAddPic()
         }
+
+        captureButton2.setOnClickListener{
+            takePicture(2)
+        }
+
+        swapButton.setOnClickListener{
+            applyModel()
+        }
+
 
         val useGpuSwitch: Switch = findViewById(R.id.switch_use_gpu)
 
         // Request camera permission
-        /*
+
         if (allPermissionsGranted()) {
             //addCameraFragment()
         } else {
@@ -124,8 +149,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
                     REQUIRED_PERMISSIONS,
                     REQUEST_CODE_PERMISSIONS
             )
-        }*/
-
+        }
 
         viewModel = AndroidViewModelFactory(application).create(MLExecutionViewModel::class.java)
         viewModel.resultingBitmap.observe(
@@ -155,22 +179,126 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
             }
         }
 
-        setChipsToLogView(HashMap<String, Int>())
+        setChipsToLogView(HashMap<String, Int>() )
         enableControls(true)
 
-        backgroundBitmap = loadImage(INPUT)!!
+        //backgroundBitmap = loadImage(INPUT)!!
 
-         
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && requestCode == pickImage) {
-            if(requestCode==100) {
-                originalImageView.setImageURI(data?.data)
-            }else{
-                maskImageView.setImageURI(data?.data)
+            if (data != null) {
+                lastSavedFile = data.data.toString()
             }
+            originalImageView.setImageURI(data?.data)
+        }
+        if(requestCode==101 && resultCode == RESULT_OK) {
+
+            val contentUri: Uri? =  data?.data
+            val cr:ContentResolver = contentResolver
+            val input: InputStream? = cr.openInputStream(contentUri!!)
+            backgroundBitmap = BitmapFactory.decodeStream(input)
+
+            maskImageView.setImageURI(data.data)
+
+        }
+        if (requestCode == REQEST_TAKE_PHOTO && resultCode == RESULT_OK) {
+            //picture.rotation = 90f
+            //val imageBitmap = data?.extras?.get("data") as Bitmap
+            originalImageView.setImageURI(Uri.parse(currentPhotoPath))
+        }
+        if (requestCode == REQEST_TAKE_PHOTO+1 && resultCode == RESULT_OK) {
+
+            val imageUri: Uri? = Uri.parse("file://$currentPhotoPath")
+            backgroundBitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, imageUri)
+            maskImageView.setImageBitmap(backgroundBitmap)
+
+        }
+    }
+
+    private fun takePicture(code : Int) {
+        Intent(MediaStore.ACTION_IMAGE_CAPTURE).also { takePictureIntent ->
+            // Ensure that there's a camera activity to handle the intent
+            takePictureIntent.resolveActivity(packageManager)?.also {
+                // Create the File where the photo should go
+                val photoFile: File? = try {
+                    createImageFile()
+                } catch (ex: IOException) {
+                    // Error occurred while creating the File
+                    null
+                }
+                // Continue only if the File was successfully created
+                photoFile?.also {
+                    val photoURI: Uri = FileProvider.getUriForFile(
+                        this,
+                        "com.example.android.fileprovider",
+                        it
+                    )
+                    takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                    if(code == 1) {
+                        lastSavedFile = photoFile.absolutePath
+                        startActivityForResult(takePictureIntent, REQEST_TAKE_PHOTO)
+                    }
+                    if(code == 2) {
+                        startActivityForResult(takePictureIntent, REQEST_TAKE_PHOTO+1)
+                    }
+
+                }
+            }
+        }
+        /*
+        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+
+        if(intent.resolveActivity(packageManager) != null) {
+            var photoFile: File? = null
+            try{
+                photoFile = createImageFile()
+            }catch (e: IOException){}
+            if(photoFile != null) {
+                val photoUri = FileProvider.getUriForFile(
+                    this,
+                    "com.example.android.fileprovider",
+                    photoFile
+                )
+                intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+
+                if(code == 1) {
+                    //lastSavedFile = photoFile.absolutePath
+                    startActivityForResult(intent, REQEST_TAKE_PHOTO)
+                }
+                if(code == 2) {
+                    startActivityForResult(intent, REQEST_TAKE_PHOTO+1)
+                }
+
+            }
+        }
+
+         */
+    }
+
+    private fun galleryAddPic() {
+        Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).also { mediaScanIntent ->
+            val f = File(currentPhotoPath)
+            mediaScanIntent.data = Uri.fromFile(f)
+            sendBroadcast(mediaScanIntent)
+        }
+    }
+
+    @SuppressLint("SimpleDateFormat")
+    @Throws(IOException::class)
+    private fun createImageFile(): File {
+        // Create an image file name
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        return File.createTempFile(
+            "JPEG_${timeStamp}_", /* prefix */
+            ".jpg", /* suffix */
+            storageDir /* directory */
+        ).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            currentPhotoPath = absolutePath
         }
     }
 
@@ -238,14 +366,42 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         val resultOnBackground = maskBitmap(backgroundBitmap,
                 resultBitmap,
                 PorterDuff.Mode.SRC_OVER)
-        //setImageView(resultImageView, resultBitmap)
-        setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
-        setImageView(maskImageView, resultOnBackground)
+
+        originalImageView.setImageBitmap(resultOnBackground)
+        val intent = Intent(this, ViewResult::class.java)
+
+        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+        File.createTempFile(
+            "JPEG_${timeStamp}_", /* prefix */
+            ".jpg", /* suffix */
+            storageDir /* directory */
+        ).apply {
+            // Save a file: path for use with ACTION_VIEW intents
+            currentPhotoPath = absolutePath
+        }
+
+        File(storageDir, timeStamp).writeBitmap(resultOnBackground, Bitmap.CompressFormat.PNG, 85)
+
+        intent.putExtra("PATH", currentPhotoPath)
+        if(resultOnBackground.width != 0) {
+           // startActivity(intent)
+        }
+        //setImageView(resultImageView, resultOnBackground)
+        //setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
+        //setImageView(maskImageView, resultOnBackground)
         val logText: TextView = findViewById(R.id.log_view)
         logText.text = modelExecutionResult.executionLog
 
         setChipsToLogView(modelExecutionResult.itemsFound)
         enableControls(true)
+    }
+
+    private fun File.writeBitmap(bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int) {
+        outputStream().use { out ->
+            bitmap.compress(format, quality, out)
+            out.flush()
+        }
     }
 
     private fun enableControls(enable: Boolean) {
@@ -264,10 +420,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
-            if (allPermissionsGranted()) {
-                addCameraFragment()
-                viewFinder.post {  }
-            } else {
+            if (!allPermissionsGranted()) {
                 Toast.makeText(
                         this,
                         "Permissions not granted by the user.",
@@ -277,7 +430,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
             }
         }
     }
-
+/*
     private fun addCameraFragment() {
         cameraFragment = CameraFragment.newInstance()
         cameraFragment.setFacingCamera(lensFacing)
@@ -286,7 +439,7 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
                 .replace(R.id.mask_imageview, cameraFragment)
                 .commit()
     }
-
+*/
     /**
      * Check if all permission specified in the manifest have been granted
      */
@@ -296,13 +449,11 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    override fun onCaptureFinished(file: File) {
-        val msg = "Photo capture succeeded: ${file.absolutePath}"
-        Log.d(TAG, msg)
+    private fun applyModel() {
+        //val msg = "Photo capture succeeded: ${file.absolutePath}"
 
-        lastSavedFile = file.absolutePath
         enableControls(false)
-        viewModel.onApplyModel(file.absolutePath, imageSegmentationModel, inferenceThread)
+        viewModel.onApplyModel(lastSavedFile, imageSegmentationModel, inferenceThread)
     }
 
     fun maskBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
@@ -337,4 +488,6 @@ class MainActivity : AppCompatActivity(), CameraFragment.OnCaptureFinished {
         val inputStream: InputStream? = assets.open(fileName)
         return BitmapFactory.decodeStream(inputStream)
     }
+
+
 }
