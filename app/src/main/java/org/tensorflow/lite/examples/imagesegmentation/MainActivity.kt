@@ -20,6 +20,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
+import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.content.Intent
@@ -52,9 +53,7 @@ import kotlinx.coroutines.async
 import org.tensorflow.lite.examples.imagesegmentation.camera.CameraFragment
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ImageSegmentationModelExecutor
 import org.tensorflow.lite.examples.imagesegmentation.tflite.ModelExecutionResult
-import java.io.File
-import java.io.IOException
-import java.io.InputStream
+import java.io.*
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.Executors
@@ -66,7 +65,7 @@ import kotlin.collections.HashMap
 private const val REQUEST_CODE_PERMISSIONS = 10
 
 // This is an array of all the permission specified in the manifest
-private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.READ_EXTERNAL_STORAGE)
 
 private const val TAG = "MainActivity"
 
@@ -189,11 +188,19 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && requestCode == pickImage) {
+
             if (data != null) {
-                lastSavedFile = data.data.toString()
+                val uriPathHelper = URIPathHelper()
+                val filePath = uriPathHelper.getPath(this, data.data!!)
+                if (filePath != null) {
+                    lastSavedFile = filePath
+                    Log.i("XD", lastSavedFile)
+                }
             }
+
             originalImageView.setImageURI(data?.data)
         }
+
         if(requestCode==101 && resultCode == RESULT_OK) {
 
             val contentUri: Uri? =  data?.data
@@ -204,11 +211,15 @@ class MainActivity : AppCompatActivity() {
             maskImageView.setImageURI(data.data)
 
         }
+
         if (requestCode == REQEST_TAKE_PHOTO && resultCode == RESULT_OK) {
             //picture.rotation = 90f
             //val imageBitmap = data?.extras?.get("data") as Bitmap
             originalImageView.setImageURI(Uri.parse(currentPhotoPath))
+            Log.i("XD", lastSavedFile)
+
         }
+
         if (requestCode == REQEST_TAKE_PHOTO+1 && resultCode == RESULT_OK) {
 
             val imageUri: Uri? = Uri.parse("file://$currentPhotoPath")
@@ -359,10 +370,12 @@ class MainActivity : AppCompatActivity() {
                 .into(imageView)
     }
 
+    @SuppressLint("SimpleDateFormat")
     private fun updateUIWithResults(modelExecutionResult: ModelExecutionResult) {
         val resultBitmap = maskBitmap(modelExecutionResult.bitmapOriginal,
                 modelExecutionResult.bitmapMaskOnly,
                 PorterDuff.Mode.DST_IN)
+
         val resultOnBackground = maskBitmap(backgroundBitmap,
                 resultBitmap,
                 PorterDuff.Mode.SRC_OVER)
@@ -370,23 +383,13 @@ class MainActivity : AppCompatActivity() {
         originalImageView.setImageBitmap(resultOnBackground)
         val intent = Intent(this, ViewResult::class.java)
 
-        val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val storageDir: File? = getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-        File.createTempFile(
-            "JPEG_${timeStamp}_", /* prefix */
-            ".jpg", /* suffix */
-            storageDir /* directory */
-        ).apply {
-            // Save a file: path for use with ACTION_VIEW intents
-            currentPhotoPath = absolutePath
-        }
+        val path = createImageFromBitmap(resultOnBackground)
 
-        File(storageDir, timeStamp).writeBitmap(resultOnBackground, Bitmap.CompressFormat.PNG, 85)
-
-        intent.putExtra("PATH", currentPhotoPath)
+        intent.putExtra("PATH", path)
         if(resultOnBackground.width != 0) {
-           // startActivity(intent)
+            startActivity(intent)
         }
+
         //setImageView(resultImageView, resultOnBackground)
         //setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
         //setImageView(maskImageView, resultOnBackground)
@@ -395,6 +398,16 @@ class MainActivity : AppCompatActivity() {
 
         setChipsToLogView(modelExecutionResult.itemsFound)
         enableControls(true)
+    }
+
+    private fun createImageFromBitmap(bitmap: Bitmap): String {
+        val fileName: String = "myImage"
+        val bytes: ByteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes)
+        val fo: FileOutputStream = openFileOutput(fileName, Context.MODE_PRIVATE)
+        fo.write(bytes.toByteArray())
+        fo.close()
+        return fileName
     }
 
     private fun File.writeBitmap(bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int) {
@@ -488,6 +501,5 @@ class MainActivity : AppCompatActivity() {
         val inputStream: InputStream? = assets.open(fileName)
         return BitmapFactory.decodeStream(inputStream)
     }
-
 
 }

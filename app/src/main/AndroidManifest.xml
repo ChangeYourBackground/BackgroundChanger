@@ -17,7 +17,9 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
         android:theme="@style/AppTheme.ImageSegmentation"
+        android:requestLegacyExternalStorage="true"
         tools:ignore="GoogleAppIndexingWarning">
+
         <activity android:name=".ViewResult"></activity>
         <activity
             android:name=".MainActivity"

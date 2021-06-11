@@ -3,18 +3,21 @@ package org.tensorflow.lite.examples.imagesegmentation
 import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Button
 import android.widget.ImageView
 import com.bumptech.glide.Glide
 import org.tensorflow.lite.examples.imagesegmentation.R.id.resultView
 import java.io.File
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.io.OutputStream
 
 @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
@@ -28,15 +31,18 @@ class ViewResult : AppCompatActivity() {
         val path:String = intent.getStringExtra("PATH")
         val view: ImageView = findViewById(R.id.resultView)
 
-        val imageUri: Uri? = Uri.parse("file://$path")
-        val bitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, imageUri)
-        /*
+
+        //val inputStream: InputStream = assets.open(path)
+        val bitmap = BitmapFactory.decodeStream(this.openFileInput(path))
+        if(bitmap == null) {
+            Log.i("xd", path)
+        }
         Glide.with(baseContext)
             .load(bitmap)
             .override(512, 512)
             .fitCenter()
             .into(view)
-         */
+
 
         val button: Button = findViewById(R.id.saveButton)
 
