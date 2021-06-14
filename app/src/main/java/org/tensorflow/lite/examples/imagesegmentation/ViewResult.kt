@@ -2,6 +2,7 @@ package org.tensorflow.lite.examples.imagesegmentation
 
 import android.annotation.SuppressLint
 import android.content.ContentValues
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -28,15 +29,13 @@ class ViewResult : AppCompatActivity() {
         setContentView(R.layout.activity_view_result2)
 
         intent.getByteArrayExtra("bitmap")
-        val path:String = intent.getStringExtra("PATH")
+        val path: String = intent.getStringExtra("PATH")
         val view: ImageView = findViewById(R.id.resultView)
 
 
         //val inputStream: InputStream = assets.open(path)
         val bitmap = BitmapFactory.decodeStream(this.openFileInput(path))
-        if(bitmap == null) {
-            Log.i("xd", path)
-        }
+
         Glide.with(baseContext)
             .load(bitmap)
             .override(512, 512)
@@ -46,7 +45,7 @@ class ViewResult : AppCompatActivity() {
 
         val button: Button = findViewById(R.id.saveButton)
 
-        button.setOnClickListener{
+        button.setOnClickListener {
             val filename = "${System.currentTimeMillis()}.jpg"
             var fos: OutputStream? = null
 
@@ -61,15 +60,15 @@ class ViewResult : AppCompatActivity() {
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it)
 
             }
+            galleryAddPic(path)
         }
-
     }
 
-    private fun setImageView(imageView: ImageView, image: Bitmap) {
-        Glide.with(baseContext)
-            .load(image)
-            .override(512, 512)
-            .fitCenter()
-            .into(imageView)
+    private fun galleryAddPic(path: String) {
+        Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE).also { mediaScanIntent ->
+            val f = File(path)
+            mediaScanIntent.data = Uri.fromFile(f)
+            sendBroadcast(mediaScanIntent)
+        }
     }
 }

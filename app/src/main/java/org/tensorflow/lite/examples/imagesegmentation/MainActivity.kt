@@ -71,16 +71,11 @@ private const val TAG = "MainActivity"
 
 class MainActivity : AppCompatActivity() {
 
-    //private val INPUT = "input_image.jpg"
     private lateinit var backgroundBitmap: Bitmap
-    private lateinit var cameraFragment: CameraFragment
     private lateinit var viewModel: MLExecutionViewModel
-    private lateinit var viewFinder: FrameLayout
-    private lateinit var resultImageView: ImageView
     private lateinit var originalImageView: ImageView
     private lateinit var maskImageView: ImageView
     private lateinit var chipsGroup: ChipGroup
-    private lateinit var rerunButton: Button
     private lateinit var captureButton1: ImageButton
     private lateinit var captureButton2: ImageButton
     private lateinit var galleryButton1: FloatingActionButton
@@ -94,10 +89,7 @@ class MainActivity : AppCompatActivity() {
     private var useGPU = false
     private var imageSegmentationModel: ImageSegmentationModelExecutor? = null
     private val inferenceThread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
-    private val mainScope = MainScope()
     private val pickImage = 100
-
-    private var lensFacing = CameraCharacteristics.LENS_FACING_FRONT
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -135,14 +127,9 @@ class MainActivity : AppCompatActivity() {
             applyModel()
         }
 
-
-        val useGpuSwitch: Switch = findViewById(R.id.switch_use_gpu)
-
         // Request camera permission
 
-        if (allPermissionsGranted()) {
-            //addCameraFragment()
-        } else {
+        if (!allPermissionsGranted()) {
             ActivityCompat.requestPermissions(
                     this,
                     REQUIRED_PERMISSIONS,
@@ -163,25 +150,8 @@ class MainActivity : AppCompatActivity() {
 
         createModelExecutor(useGPU)
 
-        useGpuSwitch.setOnCheckedChangeListener { _, isChecked ->
-            useGPU = isChecked
-            mainScope.async(inferenceThread) {
-                createModelExecutor(useGPU)
-            }
-        }
-
-        rerunButton = findViewById(R.id.rerun_button)
-        rerunButton.setOnClickListener {
-            if (lastSavedFile.isNotEmpty()) {
-                enableControls(false)
-                viewModel.onApplyModel(lastSavedFile, imageSegmentationModel, inferenceThread)
-            }
-        }
-
         setChipsToLogView(HashMap<String, Int>() )
         enableControls(true)
-
-        //backgroundBitmap = loadImage(INPUT)!!
 
     }
 
@@ -194,7 +164,6 @@ class MainActivity : AppCompatActivity() {
                 val filePath = uriPathHelper.getPath(this, data.data!!)
                 if (filePath != null) {
                     lastSavedFile = filePath
-                    Log.i("XD", lastSavedFile)
                 }
             }
 
@@ -213,15 +182,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (requestCode == REQEST_TAKE_PHOTO && resultCode == RESULT_OK) {
-            //picture.rotation = 90f
-            //val imageBitmap = data?.extras?.get("data") as Bitmap
             originalImageView.setImageURI(Uri.parse(currentPhotoPath))
-            Log.i("XD", lastSavedFile)
-
         }
 
         if (requestCode == REQEST_TAKE_PHOTO+1 && resultCode == RESULT_OK) {
-
             val imageUri: Uri? = Uri.parse("file://$currentPhotoPath")
             backgroundBitmap = MediaStore.Images.Media.getBitmap(this.contentResolver, imageUri)
             maskImageView.setImageBitmap(backgroundBitmap)
@@ -259,34 +223,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
-        /*
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-
-        if(intent.resolveActivity(packageManager) != null) {
-            var photoFile: File? = null
-            try{
-                photoFile = createImageFile()
-            }catch (e: IOException){}
-            if(photoFile != null) {
-                val photoUri = FileProvider.getUriForFile(
-                    this,
-                    "com.example.android.fileprovider",
-                    photoFile
-                )
-                intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
-
-                if(code == 1) {
-                    //lastSavedFile = photoFile.absolutePath
-                    startActivityForResult(intent, REQEST_TAKE_PHOTO)
-                }
-                if(code == 2) {
-                    startActivityForResult(intent, REQEST_TAKE_PHOTO+1)
-                }
-
-            }
-        }
-
-         */
     }
 
     private fun galleryAddPic() {
@@ -362,25 +298,17 @@ class MainActivity : AppCompatActivity() {
         return ColorStateList(states, colors)
     }
 
-    private fun setImageView(imageView: ImageView, image: Bitmap) {
-        Glide.with(baseContext)
-                .load(image)
-                .override(512, 512)
-                .fitCenter()
-                .into(imageView)
-    }
-
     @SuppressLint("SimpleDateFormat")
     private fun updateUIWithResults(modelExecutionResult: ModelExecutionResult) {
-        val resultBitmap = maskBitmap(modelExecutionResult.bitmapOriginal,
+        val resultBitmap = applyMaskOnBitmap(modelExecutionResult.bitmapOriginal,
                 modelExecutionResult.bitmapMaskOnly,
                 PorterDuff.Mode.DST_IN)
 
-        val resultOnBackground = maskBitmap(backgroundBitmap,
+        val resultOnBackground = applyMaskOnBitmap(backgroundBitmap,
                 resultBitmap,
                 PorterDuff.Mode.SRC_OVER)
 
-        originalImageView.setImageBitmap(resultOnBackground)
+        //originalImageView.setImageBitmap(resultOnBackground)
         val intent = Intent(this, ViewResult::class.java)
 
         val path = createImageFromBitmap(resultOnBackground)
@@ -390,9 +318,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
-        //setImageView(resultImageView, resultOnBackground)
-        //setImageView(originalImageView, modelExecutionResult.bitmapOriginal)
-        //setImageView(maskImageView, resultOnBackground)
         val logText: TextView = findViewById(R.id.log_view)
         logText.text = modelExecutionResult.executionLog
 
@@ -401,8 +326,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createImageFromBitmap(bitmap: Bitmap): String {
-        val fileName: String = "myImage"
-        val bytes: ByteArrayOutputStream = ByteArrayOutputStream()
+        val fileName = "myImage"
+        val bytes = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes)
         val fo: FileOutputStream = openFileOutput(fileName, Context.MODE_PRIVATE)
         fo.write(bytes.toByteArray())
@@ -418,14 +343,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun enableControls(enable: Boolean) {
-        rerunButton.isEnabled = enable && lastSavedFile.isNotEmpty()
-        captureButton1.isEnabled = enable
+        swapButton.isEnabled = enable
     }
 
-    /**
-     * Process result from permission request dialog box, has the request
-     * been granted? If yes, start Camera. Otherwise display a toast
-     */
     override fun onRequestPermissionsResult(
             requestCode: Int,
             permissions: Array<String>,
@@ -443,16 +363,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-/*
-    private fun addCameraFragment() {
-        cameraFragment = CameraFragment.newInstance()
-        cameraFragment.setFacingCamera(lensFacing)
-        supportFragmentManager.popBackStack()
-        supportFragmentManager.beginTransaction()
-                .replace(R.id.mask_imageview, cameraFragment)
-                .commit()
-    }
-*/
+
     /**
      * Check if all permission specified in the manifest have been granted
      */
@@ -463,15 +374,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyModel() {
-        //val msg = "Photo capture succeeded: ${file.absolutePath}"
-
-        enableControls(false)
-        viewModel.onApplyModel(lastSavedFile, imageSegmentationModel, inferenceThread)
+        if(lastSavedFile!="" && backgroundBitmap!=null) {
+            enableControls(false)
+            viewModel.onApplyModel(lastSavedFile, imageSegmentationModel, inferenceThread)
+        }
     }
 
-    fun maskBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
+    private fun applyMaskOnBitmap(bitmap: Bitmap, mask: Bitmap, mode: PorterDuff.Mode): Bitmap {
         val resultBitmap = Bitmap.createBitmap(
-                mask.width, mask.height, Bitmap.Config.ARGB_8888
+            mask.width, mask.height, Bitmap.Config.ARGB_8888
         )
 
         // paint to mask
@@ -481,25 +392,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         Canvas(resultBitmap).apply {
-            // draw source bitmap on canvas
+
             drawBitmap(bitmap, 0f, 0f, null)
-            // mask bitmap
+
             drawBitmap(mask, 0f, 0f, paint)
         }
 
         return resultBitmap
-    }
-
-    private fun convertToAlphaMask(mask: Bitmap): Bitmap {
-        val alphaMask = Bitmap.createBitmap(mask.width, mask.height, Bitmap.Config.ALPHA_8)
-        val canvas = Canvas(alphaMask)
-        canvas.drawBitmap(mask, 0.0f, 0.0f, null)
-        return alphaMask
-    }
-
-    private fun loadImage(fileName: String): Bitmap? {
-        val inputStream: InputStream? = assets.open(fileName)
-        return BitmapFactory.decodeStream(inputStream)
     }
 
 }
